@@ -7,61 +7,54 @@
 	4. DMA Controller는 Memory Buffer에 순서대로 저장
 	5. 모든 IDE Controlller가 종료되면 Output으로 알림
 */
-
-#include <iostream>
+#include "Controller.h"
+#include <random>
+#include <ctime>
 #include <thread>
-#include <queue>
-#include <vector>
-#include <string>
-using namespace std;
+// task 할당
 
-//Memory Buffer
-vector<Task> Memory_Buffer;
-//Printer queue
-queue<Task> Printer_Queue;
-//Monitor queue
-queue<Task> Monitor_Queue;
-//Speaker queue
-queue<Task> Speaker_Queue;
-//Keyboard queue
-queue<Task> Keyboaed_Queue;
-//Disk queue
-queue<Task> Disk_Queue;
-
-//Task Struct
-struct Task {
-	int id = 0;
-	string state;
-};
-
-enum TaskState {
-PRINTER, MONITOR,SPEAKER,KEYBOARD,DISK
-};
-
-//IDE Controller
-void printer() {
-
+void alloc_task(Task* task_input, int task_num) {
+	srand((unsigned int)time(NULL));
+	for (int i = 0; i < task_num; i++) {
+		task_input[i].id = i;
+		task_input[i].state = (TaskState)(rand() %5 +1);
+	}
 }
-void monitor() {
-
-}
-void mouse() {
-
-}
-void spearker() {
-
-}
-void keyboard() {
-
-}
-void disk() {
-
-}
-//DMA Controller
-void DMA_controller() {
-
+//task state 출력
+string printState(Task task) {
+	switch (task.state) {
+	case 1: return "PRINTER";
+	case 2: return "MONITOR";
+	case 3: return"SPEAKER";
+	case 4: return"KEYBOARD";
+	case 5: return "DISK";
+	}
 }
 //main
 int main() {
+	int task_num;
+	cin >> task_num;
+	Task* task_input;
+	task_input = new Task[task_num];
+	//task 할당
+	alloc_task(task_input, task_num);
+	Controller Control(task_input,task_num);
 
+	//thread 생성
+	thread printer{ &Controller::printer,&Control ,task_num};
+	thread monitor{ &Controller::monitor,&Control,task_num };
+	thread speaker{ &Controller::spearker,&Control,task_num };
+	thread keyboard{ &Controller::keyboard,&Control ,task_num };
+	thread disk{ &Controller::disk,&Control,task_num };
+
+	while (task_num != 0) {
+		printer.join();
+		monitor.join();
+		speaker.join();
+		keyboard.join();
+		disk.join();
+	}
+	if (task_num == 0)
+		cout << "All of Task is Done!" << endl;
+	system("pause");
 }
