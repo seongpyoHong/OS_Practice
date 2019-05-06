@@ -8,32 +8,28 @@
 	5. 모든 IDE Controlller가 종료되면 Output으로 알림
 */
 #include "Controller.h"
-#include <random>
-#include <ctime>
-#include <thread>
-// task 할당
 
+// task 할당
 void alloc_task(Task* task_input, int task_num) {
 	srand((unsigned int)time(NULL));
 	for (int i = 0; i < task_num; i++) {
 		task_input[i].id = i;
-		task_input[i].state = (TaskState)(rand() %5 +1);
+		task_input[i].state = (TaskState)(rand() %5);
 	}
 }
-//task state 출력
-string printState(Task task) {
-	switch (task.state) {
-	case 1: return "PRINTER";
-	case 2: return "MONITOR";
-	case 3: return"SPEAKER";
-	case 4: return"KEYBOARD";
-	case 5: return "DISK";
-	}
-}
+
 //main
 int main() {
 	int task_num;
-	cin >> task_num;
+	//Task 갯수 입력
+	while (1) {
+		cout << "Please Input Count : ";
+		cin >> task_num;
+		if (task_num < 500)
+			cout << "Please Retry ! " << endl;
+		else break;
+	}
+	
 	Task* task_input;
 	task_input = new Task[task_num];
 	//task 할당
@@ -41,20 +37,18 @@ int main() {
 	Controller Control(task_input,task_num);
 
 	//thread 생성
-	thread printer{ &Controller::printer,&Control ,task_num};
-	thread monitor{ &Controller::monitor,&Control,task_num };
-	thread speaker{ &Controller::spearker,&Control,task_num };
-	thread keyboard{ &Controller::keyboard,&Control ,task_num };
-	thread disk{ &Controller::disk,&Control,task_num };
+	thread printer{ &Controller::printer,&Control};
+	thread monitor{ &Controller::monitor,&Control};
+	thread speaker{ &Controller::spearker,&Control };
+	thread keyboard{ &Controller::keyboard,&Control};
+	thread disk{ &Controller::disk,&Control};
 
-	while (task_num != 0) {
-		printer.join();
-		monitor.join();
-		speaker.join();
-		keyboard.join();
-		disk.join();
-	}
-	if (task_num == 0)
-		cout << "All of Task is Done!" << endl;
+	//thread 종료를 기다린다.
+	printer.join();
+	monitor.join();
+	speaker.join();
+	keyboard.join();
+	disk.join();
+
 	system("pause");
 }
