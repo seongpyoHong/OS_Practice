@@ -37,17 +37,15 @@ vector<Space> space;
 bool compare(Space x, Space y) {
 	return x.start_address < y.start_address;
 }
-
-//할당할 공간을 찾는 함수
-bool findSpace(Process P) {
-	/*
+/*
 	넣을 공간이 있다면 가장 최적의 공간(space - process의 크기가 가장 작은 경우)에 넣는다.
 	넣을 공간이 없는 경우 false를 반환한다.
-	*/
+*/
+bool findSpace(Process P) {
 	int index = -1;
 	int best = 1000000;
 	for (int i = 0; i < space.size(); i++) {
-		if (space[i].check && P.alloc_size < space[i].size) {
+		if (!space[i].check && P.alloc_size <= space[i].size) {
 			int temp_best = min(best, (space[i].size - P.alloc_size));
 			if (best != temp_best) {
 				best = temp_best;
@@ -76,6 +74,9 @@ bool findSpace(Process P) {
 				new_space.end_address = space[i].end_address;
 				new_space.start_address = alloc_space.end_address;
 				new_space.size = new_space.end_address - new_space.start_address;
+				vector<Space>::iterator itor = space.begin();
+				itor += i;
+				space.erase(itor);
 				space.push_back(new_space);
 				//alloc_space 추가
 				space.push_back(alloc_space);
@@ -86,26 +87,107 @@ bool findSpace(Process P) {
 			return true;
 	}
 	//넣을 수 있는 공간이 없는 경우
-	else return false;
+	else 
+		return false;
 }
-void compaction() {
-	/*
+
+//현재상태 출력
+void printState() {
+	cout << "==========================Current Memory=========================\n";
+	for (int i = 0; i < space.size(); i++) {
+		if (space[i].check) {
+			cout << "Allocate :  Yes" << endl;
+			cout << "Pid : " << space[i].alloc_pid << endl;
+			cout << "Start Address : " << space[i].start_address << endl;
+			cout << "End Address : " << space[i].end_address << endl;
+			cout << "=================================================================\n";
+
+		}
+		else if (!space[i].check) {
+			cout << "Allocate :  No" << endl;
+			cout << "Start Address : " << space[i].start_address << endl;
+			cout << "End Address : " << space[i].end_address << endl;
+			cout << "=================================================================\n";
+		}
+	}
+}
+
+/*
 	넣을 공간이 없는 경우 재구성해야하는데 재구성할 때 가장 적게 움직이는 경우의 수로 움직여야 한다.
-	*/
+	0K 부터 공백을 탐색
+	end K부터 process 탐색
+	공백과 같은 크기를 같는 할당된 공간이 있다면 공백에 삽입
+*/
+void compaction(int size) {
+	bool flag = false;
+	for (int i = 0; i < space.size() - 1; i++) {
+		if (!space[i].check) {
+			for (int j = space.size()-1; j >= i+1; j--) {
+				if (space[j].check && space[j].size <= space[i].size) {
+					flag = true;
+					//밑에 공간 할당 해제
+					space[j].check = false;
+					//위의 공간을 할당하고 재분배
+					if (space[i].size == space[j].size) {
+						space[i].end_address = space[i].start_address + space[j].size;
+						space[i].size = space[j].size;
+						space[i].check = true;
+						space[i].alloc_pid = space[j].alloc_pid;
+					}
+					else {
+						Space temp;
+						temp.check = false;
+						temp.end_address = space[i].end_address;
+						space[i].end_address = space[i].start_address + space[j].size;
+						space[i].size = space[j].size;
+						space[i].check = true;
+						space[i].alloc_pid = space[j].alloc_pid;
+						temp.start_address = space[i].end_address;
+						space.push_back(temp);
+					}
+					sort(space.begin(), space.end(), compare);
+					break;
+				}
+			}
+		}
+		if (flag) {
+			flag = false;
+			i = 0;
+		}
+	}
 }
 
-void coalescing() {
-	/*
-	compaction이 수행되고 난 후, 새롭게 block이 삽입되고 난 후 
-	서로 연결되야 하는 space 및 process가 있다면 연결시켜줘야 한다.
-	
-	*/
+/*
+	compaction이 수행되고 난 후, 새롭게 block이 삽입되고 난 후
+	서로 연결되야 하는 space 및 process가 있다면 연결
+*/
+void coalescing() {	
+	for (int i = 0; i < space.size()-1; i++) {
+		if (!space[i].check && !space[i + 1].check && space[i].end_address == space[i + 1].start_address) {
+			cout << "\nCoalescing blocks at addresses " << space[i].start_address << "K and " << space[i + 1].start_address << "K" << endl;
+			space[i].end_address = space[i + 1].end_address;
+			space[i].size += space[i + 1].size;
+			vector<Space>::iterator itor = space.begin();
+			itor += (i + 1);
+			space.erase(itor);
+		}
+	}
 }
 
+/*
+	할당된 메모리를 해제한다.
+*/
+void freeMemory(int pid) {
+	for (int i = 0; i < space.size(); i++) {
+		if (space[i].check && space[i].alloc_pid == pid)
+			space[i].check = false;
+	}
+}
 
 int main() {
 	//메모리 사이즈 입력
 	int Memory_Size;
+	cout << "Memory Size : ";
 	cin >> Memory_Size;
 	//초기공간 할당
 	Space initspace;
@@ -117,6 +199,7 @@ int main() {
 
 	//프로세스 개수 입력
 	int NumberOfProcess;
+	cout << "Numer Of Process : ";
 	cin >> NumberOfProcess;
 
 	//Process pid 할당 및 초기값 설정
@@ -132,6 +215,7 @@ int main() {
 	//-1을 입력받으면 입력 종료
 	while (1) {
 		int process_id, alloc_size;
+		cout << "Input Pid and Allocate Size (Last Input : -1 -1) \n";
 		cin >> process_id >> alloc_size;
 		input.push_back(process_id);
 		input.push_back(alloc_size);
@@ -145,23 +229,35 @@ int main() {
 		int process_id = input[i];
 		int alloc_size = input[i + 1];
 		if (alloc_size != 0) {
-			printf("Request %d : %d K\n", process_id, alloc_size);
+			printf("\nRequest %d : %d K\n", process_id, alloc_size);
 			//process에 alloc_size 할당
 			process[process_id].alloc_size = alloc_size;
 			//공간이 있을 때 : best fit에 적용
 			if (findSpace(process[process_id])) {
-				
+				printState();
+				system("pause");
+				system("cls");
 			}
 			//공간이 없을 때 compaction 진행 후 넣는다.
-			else if (!findSpace()) {
-
+			else if (!findSpace(process[process_id])) {
+				compaction(process[process_id].alloc_size);
+				coalescing();
+				if (!findSpace(process[process_id]))
+					cout << "Can't Allocate ! " << endl;
+				printState();
+				system("pause");
+				system("cls");
 			}
 		}
 		else {
-			printf("Free Request %d : %d\n", process_id, process[process_id].alloc_size);
 			//할당된 프로세스를 해제해주고 state 체크
+			printf("\nFree Request %d : %d\n", process_id, process[process_id].alloc_size);
+			freeMemory(process_id);
+			coalescing();
+			printState();
+			system("pause");
+			system("cls");
 		}
 	}
-	system("pause");
 	return 0;
 }
